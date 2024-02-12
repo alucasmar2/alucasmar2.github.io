@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Ana Lucas</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="css/w3.css">
+<link rel="stylesheet" href="css/google_fonts.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+<link rel="stylesheet" href="css/lightbox.css"/>
+<style>
+body,h1,h2,h3,h4,h5,h6 {font-family: "Raleway", sans-serif}
+</style>
+</head>
+<body class="w3-light-grey w3-content" style="max-width:1600px">
+    <div class="w3-container w3-padding-large">
+        Post name<br>
+        <input name="pname" type="text"/><br>
+        
+        Post description<br>
+        <input name="pdesc" type="text"/><br>
+        
+        Post number<br>
+        <input name="pnumber" type="text"/><br>
+        <div class="radio-group">
+            <label for="art">Art</label>
+            <input type="radio" id="art" name="category" value="art" checked>
+
+            <label for="design">Design</label>
+            <input type="radio" id="design" name="category" value="design">
+
+            <label for="photography">Photography</label>
+            <input type="radio" id="photography" name="category" value="photography">
+        </div>
+        
+        <input type="file" id="image-selector" multiple>
+        <button id="select-images-button">Select Images</button>
+    </div>
+    <div class="w3-container w3-padding-large w3-teal" style="margin-bottom:32px">
+        <code id="output"></code>
+    </div>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+<script src="js/jszip.js"></script>
+<script>
+let npics = 1;
+var pnumber = 1;
+var pname = $("[name=pname]").val();
+var pdesc = $("[name=pdesc]").val();
+pnumber = $("[name=pnumber]").val();
+var pclass = $(".radio-group input").val();
+$(function() {
+	$("input[type=text], input[type=radio]").on("input", function() {
+  	pname = $("[name=pname]").val();
+    pdesc = $("[name=pdesc]").val();
+    pnumber = $("[name=pnumber]").val();
+    pclass = $(".radio-group input").val();
+
+    $("#output").get(0).innerHTML = $('<div/>').text('<div class="w3-third w3-container w3-margin-bottom post '+pclass+'" id="post-'+pnumber+'" onclick="handleGallery(this)" data-npics="'+npics+'"> \
+          <img src="posts/'+ pnumber +'/1.jpg" alt="'+pname+'" style="width:100%" class="w3-hover-opacity"> \
+          <div class="w3-container w3-white"> \
+            <p><b>'+pname+'</b></p> \
+            <p>'+pdesc+'</p> \
+        </div> \ </div>').html();
+  });
+});
+$(function() {
+    $(".radio-group input").on("change", function() {
+        pclass = $(this).val();
+        console.log("Selected category:", pclass);
+        pname = $("[name=pname]").val();
+        pdesc = $("[name=pdesc]").val();
+        pnumber = $("[name=pnumber]").val();
+
+        $("#output").get(0).innerHTML = $('<div/>').text('<div class="w3-third w3-container w3-margin-bottom post '+pclass+'" id="post-'+pnumber+'" onclick="handleGallery(this)" data-npics="'+npics+'"> \
+            <img src="posts/'+ pnumber +'/1.jpg" alt="'+pname+'" style="width:100%" class="w3-hover-opacity"> \
+            <div class="w3-container w3-white"> \
+                <p><b>'+pname+'</b></p> \
+                <p>'+pdesc+'</p> \
+            </div> \ </div>').html();
+        // You can add further actions based on the selected value here
+    });
+});
+</script>
+<script>
+$(document).ready(function() {
+  let targetFileSize = 1000 * 1024; // Target file size in bytes (adjust as needed)
+  let imageCounter = 0; // Counter for naming images
+  const compressedImages = []; // Array to store compressed images
+  let selectedFiles = null;
+
+  $("#select-images-button").click(function() {
+    $("#image-selector").trigger("click");
+  });
+
+  $("#image-selector").change(function() {
+    selectedFiles = this.files;
+    npics = selectedFiles.length;
+
+    for (let i = 0; i < selectedFiles.length; i++) {
+      const file = selectedFiles[i];
+      const reader = new FileReader();
+
+      reader.onload = function(e) {
+        console.log(e.target.result.length);
+        compressedImages.push(e.target.result);
+        imageCounter++;
+      };
+      
+      reader.readAsDataURL(file);
+    }
+  });
+
+  // Function to compress an image using a canvas
+  async function compressImage(imageData, targetFileSize) {
+    const canvas = document.createElement("canvas");
+    const image = new Image();
+    image.src = imageData;
+    await image.decode();
+    canvas.width = image.width;
+    canvas.height = image.height;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+    let quality = 1; // Adjust quality as needed
+
+    while (canvas.toDataURL("image/jpeg", quality).length > targetFileSize && quality > 0) {
+        console.log(canvas.toDataURL("image/jpeg", quality).length);
+        ctx.clearRect(0, 0, canvas.width, canvas.height)
+        quality -= 0.1;
+        ctx.fillStyle = "#000";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+    }
+    return new Promise((resolve, reject) => {
+        const base64Data = canvas.toDataURL("image/jpeg").split(',')[1];
+        resolve(base64Data); // Resolve promise with Base64 data
+    });
+  }
+
+  // Function to create and download an archive
+  function downloadArchive() {
+    const zip = new JSZip();
+
+    // Add each compressed image to the archive
+    for (let i = 0; i < imageCounter; i++) {
+        const image = compressedImages.pop();
+        console.log("image len: "+image.length);
+        if (i == imageCounter -1){
+            compressImage(image, targetFileSize).then(compressedImage => {
+                console.log("compressedImage len: "+compressedImage.length);
+                zip.file(`${i + 1}.jpg`, compressedImage, { base64: true });
+                zip.generateAsync({ type: "blob" }).then(function(content) {
+                // Create a download link and trigger click
+                const downloadLink = document.createElement("a");
+                downloadLink.href = window.URL.createObjectURL(content);
+                downloadLink.download = `${pnumber}.zip`;
+                downloadLink.click();
+                });
+            })
+            .catch(error => {
+                console.error("Error compressing image:", error);
+            });
+        }else{
+            compressImage(image, targetFileSize).then(compressedImage => {
+                console.log("compressedImage len: "+compressedImage.length);
+                zip.file(`${i + 1}.jpg`, compressedImage, { base64: true });
+            })
+            .catch(error => {
+                console.error("Error compressing image:", error);
+            });
+        }
+    }
+  }
+
+  // Event listener to trigger archive download after all images are compressed
+  $("#image-selector").on("change", function() {
+    setTimeout(downloadArchive, selectedFiles.length * 10000); // Wait for compression to finish
+  });
+});
+
+</script>
+</body>
+</html>
